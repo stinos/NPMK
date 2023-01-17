@@ -1023,7 +1023,9 @@ if ~strcmpi(selectedChannels, 'all')
         end
         unWantedChannels = setdiff(uniqueChannels, selectedChannels);
         for idx = 1:length(unWantedChannels)
-            NEV.Data.Spikes.Waveform(:, NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
+            if ~isempty(NEV.Data.Spikes.Waveform)
+                NEV.Data.Spikes.Waveform(:, NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
+            end
             NEV.Data.Spikes.Unit(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
             NEV.Data.Spikes.TimeStamp(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
             NEV.Data.Spikes.Electrode(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
