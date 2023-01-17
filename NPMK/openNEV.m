@@ -896,8 +896,13 @@ if strcmpi(Flags.ReadData, 'read')
 
     clear allExtraDataPacketIndices;
     if strcmpi(Flags.waveformUnits, 'uv')
-        elecDigiFactors = double(1000./[NEV.ElectrodesInfo(NEV.Data.Spikes.Electrode).DigitalFactor]);
-        NEV.Data.Spikes.Waveform = bsxfun(@rdivide, double(NEV.Data.Spikes.Waveform), elecDigiFactors);
+        if isempty(NEV.Data.Spikes.Waveform)
+          % For consistency still cast.
+          NEV.Data.Spikes.Waveform = double(NEV.Data.Spikes.Waveform);
+        else
+          elecDigiFactors = double(1000./[NEV.ElectrodesInfo(NEV.Data.Spikes.Electrode).DigitalFactor]);
+          NEV.Data.Spikes.Waveform = bsxfun(@rdivide, double(NEV.Data.Spikes.Waveform), elecDigiFactors);
+        end
         if strcmpi(Flags.WarningStat, 'warning')
             fprintf(1,'\nThe spike waveforms are in unit of uV.\n');
             fprintf(2,'WARNING: This conversion may lead to loss of information.');
@@ -1064,7 +1069,9 @@ if ~strcmpi(selectedChannels, 'all')
         end
         unWantedChannels = setdiff(uniqueChannels, selectedChannels);
         for idx = 1:length(unWantedChannels)
-            NEV.Data.Spikes.Waveform(:, NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
+            if ~isempty(NEV.Data.Spikes.Waveform)
+                NEV.Data.Spikes.Waveform(:, NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
+            end
             NEV.Data.Spikes.Unit(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
             NEV.Data.Spikes.TimeStamp(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
             NEV.Data.Spikes.Electrode(NEV.Data.Spikes.Electrode == unWantedChannels(idx)) = [];
