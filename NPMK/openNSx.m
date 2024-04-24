@@ -487,10 +487,6 @@ if strcmpi(multinsp, 'yes')
     end
 end
 
-if strcmpi(ReadData, 'noread')
-    disp('NOTE: Reading the header information only. To read the data use with parameter ''read'': openNSx(''read'')');
-end
-
 if strcmp(Report, 'report')
     disp(['openNSx ' NSx.MetaTags.openNSxver]);
 end

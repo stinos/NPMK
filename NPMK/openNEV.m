@@ -857,11 +857,6 @@ if strcmpi(Flags.ReadData, 'read')
     if strcmpi(Flags.waveformUnits, 'uv')
         elecDigiFactors = double(1000./[NEV.ElectrodesInfo(NEV.Data.Spikes.Electrode).DigitalFactor]);
         NEV.Data.Spikes.Waveform = bsxfun(@rdivide, double(NEV.Data.Spikes.Waveform), elecDigiFactors);
-        if strcmpi(Flags.WarningStat, 'warning')
-            fprintf(1,'\nThe spike waveforms are in unit of uV.\n');
-            fprintf(2,'WARNING: This conversion may lead to loss of information.');
-            fprintf(1,'\nRefer to help for more information.\n');
-        end
     end
 end
 clear digserIndices;
