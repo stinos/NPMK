@@ -948,7 +948,7 @@ end
 if strcmpi(waveformUnits, 'uV')
     if iscell(NSx.Data) % Contribution by Michele Cox @ Vanderbilt
     	NSx.Data = cellfun(@(x) bsxfun(@rdivide, double(x), 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))'),NSx.Data ,'UniformOutput',false);
-    else
+    elseif ~isempty(NSx.Data)
         NSx.Data = bsxfun(@rdivide, double(NSx.Data), 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))');
     end % End of contribution
 else
