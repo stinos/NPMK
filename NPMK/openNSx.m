@@ -609,11 +609,6 @@ if flagReadData && flagConvertToUv && ~strcmpi(requestedPrecisionType,'double')
     requestedPrecisionType = 'double';
 end
 
-% warn if only reading header information
-if ~flagReadData
-    warning('Reading the header information only.');
-end
-
 % start the report if requested
 if flagReport
     disp(['openNSx ' NSx.MetaTags.openNSxver]);
