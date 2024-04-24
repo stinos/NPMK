@@ -1252,7 +1252,7 @@ if flagReadData && any(NSx.MetaTags.DataPoints == 0)
     NSx.MetaTags.DataDurationSec(segmentsThatAreZero) = [];
     NSx.MetaTags.Timestamp(segmentsThatAreZero) = [];
     NSx.Data(segmentsThatAreZero) = [];
-    if isfield(NSx,'Time')
+    if isfield(NSx,'Time') && ~isempty(NSx.Time)
         NSx.Time(segmentsThatAreZero) = [];
     end
 end
@@ -1346,7 +1346,7 @@ end
 
 %% Adjust for the data's unit.
 if flagReadData 
-    if flagConvertToUv
+    if flagConvertToUv && ~isempty(NSx.Data)
         NSx.Data = cellfun(@(x) bsxfun(@rdivide, x, 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))'),NSx.Data ,'UniformOutput',false);
     else
         flagShowuVWarning = 1;
