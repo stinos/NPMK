@@ -567,6 +567,8 @@ for i=1:length(varargin)
                 requestedPrecisionType = 'int16';
             case 'double'
                 requestedPrecisionType = 'double';
+            case 'single'
+                requestedPrecisionType = 'single';
             otherwise
                 error('Precision type is not valid. Refer to ''help'' for more information.');
         end
@@ -604,8 +606,8 @@ end
 clear next;
 
 % check uV conversion versus data type
-if flagReadData && flagConvertToUv && ~strcmpi(requestedPrecisionType,'double')
-    warning("Conversion to uV requires double precision; overriding user request '%s' to comply",requestedPrecisionType);
+if flagReadData && flagConvertToUv && ~strcmpi(requestedPrecisionType,'double') && ~strcmpi(requestedPrecisionType, 'single')
+    warning("Conversion to uV requires double or single precision; overriding user request '%s' to comply",requestedPrecisionType);
     requestedPrecisionType = 'double';
 end
 
@@ -1293,6 +1295,9 @@ if flagReadData && flagZeroPad
         elseif strcmpi(requestedPrecisionType,'double')
             numBytesToAdd = numValuesToAdd*8;
             numBytesOfData = numValuesOfData*8;
+        elseif strcmpi(requestedPrecisionType,'single')
+            numBytesToAdd = numValuesToAdd*4;
+            numBytesOfData = numValuesOfData*4;
         end
         
         % check whether to show the warning
@@ -1344,7 +1349,9 @@ end
 %% Adjust for the data's unit.
 if flagReadData 
     if flagConvertToUv && ~isempty(NSx.Data)
-        NSx.Data = cellfun(@(x) bsxfun(@rdivide, x, 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))'),NSx.Data ,'UniformOutput',false);
+        maxAnalogValue = cast([NSx.ElectrodesInfo.MaxAnalogValue], requestedPrecisionType);
+        maxDigitalValue = cast([NSx.ElectrodesInfo.MaxDigiValue], requestedPrecisionType);
+        NSx.Data = cellfun(@(x) bsxfun(@rdivide, x, 1./(maxAnalogValue./maxDigitalValue)'),NSx.Data ,'UniformOutput',false);
     else
         flagShowuVWarning = 1;
         if flagFoundSettingsManager
