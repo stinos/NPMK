@@ -396,8 +396,11 @@ for i=1:length(varargin)
                 precisionType = '*short=>short';
                 precisionData = 'int16';
             case 'double'
-                precisionType = '*int16';
+                precisionType = '*int16=>double';
                 precisionData = 'double';
+            case 'single'
+                precisionType = '*int16=>single';
+                precisionData = 'single';
             otherwise
                 disp('Read type is not valid. Refer to ''help'' for more information.');
                 if nargout; varargout{1} = -1; end
@@ -945,11 +948,17 @@ if ~NSx.RawData.PausedFile && StartPacket == 1 && strcmpi(zeropad, 'yes')
 end
 
 %% Adjusting for the data's unit.
+function data = ToMicroVolts(data)
+  maxAnalogValue = cast([NSx.ElectrodesInfo.MaxAnalogValue], precisionData);
+  maxDigitalValue = cast([NSx.ElectrodesInfo.MaxDigiValue], precisionData);
+  data = bsxfun(@rdivide, data, 1./(maxAnalogValue./maxDigitalValue)');
+end
+
 if strcmpi(waveformUnits, 'uV')
     if iscell(NSx.Data) % Contribution by Michele Cox @ Vanderbilt
-    	NSx.Data = cellfun(@(x) bsxfun(@rdivide, double(x), 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))'),NSx.Data ,'UniformOutput',false);
+    	NSx.Data = cellfun(@ToMicroVolts, NSx.Data, 'UniformOutput', false);
     elseif ~isempty(NSx.Data)
-        NSx.Data = bsxfun(@rdivide, double(NSx.Data), 1./(double([NSx.ElectrodesInfo.MaxAnalogValue])./double([NSx.ElectrodesInfo.MaxDigiValue]))');
+      NSx.Data = ToMicroVolts(NSx.Data);
     end % End of contribution
 else
     NPMKSettings = settingsManager;
