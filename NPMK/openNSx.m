@@ -514,7 +514,9 @@ if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALSG')
     	t                          = dir(fileFullPath);
     	NSx.MetaTags.DateTime      = t.date;
     end
-elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
     BasicHeader                = fread(FID, 306, '*uint8');
     NSx.MetaTags.FileSpec      = [num2str(double(BasicHeader(1))) '.' num2str(double(BasicHeader(2)))];
     HeaderBytes                = double(typecast(BasicHeader(3:6), 'uint32'));
@@ -527,10 +529,27 @@ elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.Fil
     NSx.MetaTags.ChannelCount  = ChannelCount;
     readSize                   = double(ChannelCount * ExtHeaderLength);
     ExtendedHeader             = fread(FID, readSize, '*uint8');
-    if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD')
+    if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT')
     	timeStampBytes = 4;
     elseif strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
         timeStampBytes = 8;
+    end
+    % Only difference between NEURALCD and NEUCDFLT: data points are 32bit float.
+    bytesPerSample = 2;
+    if strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT')
+      bytesPerSample = 4;
+      switch precisionType
+        case '*int16=>int16'
+          precisionType = '*float=>int16';
+        case '*short=>short'
+          precisionType = '*float=>short';
+        case '*int16=>double'
+          precisionType = '*float=>double';
+        case '*int16=>single'
+          precisionType = '*float=>single';
+        otherwise
+          error('unsupported precision for NEUCDFLT')
+      end
     end
     
     %% Removing extra garbage characters from the Comment field.
@@ -540,7 +559,8 @@ elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.Fil
 	for headerIDX = 1:ChannelCount
 		offset = double((headerIDX-1)*ExtHeaderLength);
 		NSx.ElectrodesInfo(headerIDX).Type = char(ExtendedHeader((1:2)+offset))';
-		if (~strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'CC'))
+		if ~strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'CC') && ...
+       ~strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'FC')
 			disp('extended header not supported');
 			fclose(FID);
 			if nargout; varargout{1} = -1; end
@@ -608,7 +628,9 @@ if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALSG')
     f.BOData = f.EOexH;
     f.EOData = f.EOF;
     NSx.MetaTags.DataPoints = (f.EOF-f.EOexH)/(ChannelCount*2);
-elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
     segmentCount = 0;
     while double(ftell(FID)) < f.EOF
         if (fread(FID, 1, 'uint8') ~= 1)
@@ -619,7 +641,7 @@ elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.Fil
             break;
         end
         segmentCount = segmentCount + 1;
-        if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD')
+        if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT')
             startTimeStamp = fread(FID, 1, 'uint32');
         elseif strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
             startTimeStamp = fread(FID, 1, 'uint64');
@@ -685,7 +707,9 @@ if NSx.RawData.PausedFile == 1
 end
 
 %% Copying ChannelID to MetaTags for filespec 2.2, 2.3, and 3.0 for compatibility with filespec 2.1
-if or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+   strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+   strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
     NSx.MetaTags.ChannelID = [NSx.ElectrodesInfo.ElectrodeID]';
 end
 
@@ -718,7 +742,9 @@ for idx = 1:length(userRequestedChannels)
 end
 
 %% Removing extra ElectrodesInfo for channels not read
-if or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+   strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+   strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
     for headerIDX = length(NSx.ElectrodesInfo):-1:1
         if ~ismember(headerIDX, userRequestedChanRow)
             NSx.ElectrodesInfo(headerIDX) = [];
@@ -845,7 +871,8 @@ if strcmp(ReadData, 'read')
             % Skip the file to the first channel to read
             fseek(FID, (find(NSx.MetaTags.ChannelID == min(userRequestedChannels))-1) * 2, 'cof');        
             % Read data
-            NSx.Data{size(NSx.Data,2)+1} = fread(FID, [numChansToRead segmentDataPoints(dataIDX)], [num2str(numChansToRead) precisionType], double((ChannelCount-numChansToRead)*2 + ChannelCount*(skipFactor-1)*2));
+            NSx.Data{size(NSx.Data,2)+1} = fread(FID, [numChansToRead segmentDataPoints(dataIDX)], [num2str(numChansToRead) precisionType], ...
+              double((ChannelCount-numChansToRead)*bytesPerSample + ChannelCount*(skipFactor-1)*bytesPerSample));
         end
         NSx.MetaTags.DataPoints = segmentDataPoints(segmentCounters(1):segmentCounters(2));
         NSx.MetaTags.Timestamp = NSx.MetaTags.Timestamp(segmentCounters(1):segmentCounters(2));
@@ -857,7 +884,8 @@ if strcmp(ReadData, 'read')
         % Skip the file to the first channel to read
         fseek(FID, (find(NSx.MetaTags.ChannelID == min(userRequestedChannels))-1) * 2, 'cof');        
         % Read data
-        NSx.Data = fread(FID, [numChansToRead DataLength], [num2str(numChansToRead) precisionType], double((ChannelCount-numChansToRead)*2 + ChannelCount*(skipFactor-1)*2));
+        NSx.Data = fread(FID, [numChansToRead DataLength], [num2str(numChansToRead) precisionType], ...
+          double((ChannelCount-numChansToRead)*bytesPerSample + ChannelCount*(skipFactor-1)*bytesPerSample));
     end
 end
 
