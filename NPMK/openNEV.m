@@ -595,6 +595,9 @@ for ii=1:Trackers.countExtHeader
             return;
     end
 end
+if isempty(NEV.ElectrodesInfo)
+  NEV.ElectrodesInfo = repmat(struct('ElectrodeID', [], 'ElectrodeLabel', ''), 0, 0);
+end
 NEV.MetaTags.ChannelID = [NEV.ElectrodesInfo.ElectrodeID];
 clear ExtendedHeader PacketID ii;
 
