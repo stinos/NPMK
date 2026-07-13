@@ -691,7 +691,9 @@ try
             NSx.MetaTags.DateTime  = '';
         end
         timestampSize             = 4;
-    elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+    elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
         
         %% Read Basic Header
         basicHeaderBytes           = fread(FID, 306, '*uint8');
@@ -705,9 +707,18 @@ try
         channelCount               = double(typecast(basicHeaderBytes(303:306), 'uint32'));
         NSx.MetaTags.ChannelCount  = channelCount;
         if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD')
+            sampleType = 'int16';
+            sampleSize = 2;
+            timestampSize = 4;
+            timestampType = 'uint32';
+        elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT')
+            sampleType = 'single';
+            sampleSize = 4;
             timestampSize = 4;
             timestampType = 'uint32';
         elseif strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
+            sampleType = 'int16';
+            sampleSize = 2;
             timestampSize = 8;
             timestampType = 'uint64';
         end
@@ -721,7 +732,7 @@ try
         for headerIDX = 1:channelCount
             byteOffset = double((headerIDX-1)*extHeaderEntrySize);
             NSx.ElectrodesInfo(headerIDX).Type = char(extendedHeaderBytes((1:2)+byteOffset))';
-            assert(strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'CC'),'extended header not supported');
+            assert(strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'CC') || strcmpi(NSx.ElectrodesInfo(headerIDX).Type, 'FC'),'extended header not supported');
             
             NSx.ElectrodesInfo(headerIDX).ChannelID = typecast(extendedHeaderBytes((3:4)+byteOffset), 'uint16');
             NSx.ElectrodesInfo(headerIDX).Label = char(extendedHeaderBytes((5:20)+byteOffset))';
@@ -765,7 +776,9 @@ try
     end
     
     % Copy ChannelID to MetaTags for filespec 2.2, 2.3, and 3.0 for compatibility with filespec 2.1
-    if or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+    if strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+       strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
         NSx.MetaTags.ChannelID = [NSx.ElectrodesInfo.ChannelID]';
     end
     
@@ -801,7 +814,7 @@ try
     
     %% Central v7.6.0 needs corrections for PTP clock drift - DK 20230303
     if NSx.MetaTags.TimeRes > 1e5
-        packetSize = 1 + timestampSize + 4 + channelCount*2; % byte (Header) + uint64 (Timestamp) + uint32 (Samples, always 1) + int16*nChan (Data)
+        packetSize = 1 + timestampSize + 4 + channelCount*sampleSize; % byte (Header) + uint64 (Timestamp) + uint32 (Samples, always 1) + int16*nChan (Data)
         numPacketsTotal = floor((f.EOF - f.EOexH)/packetSize);
         fseek(FID, f.EOexH + 1 + timestampSize, 'bof'); % byte (Header) + uint64 (Timestamp)
         patchCheck = fread(FID,10,'uint32',packetSize-4); % read "samples" counts from 10 packets
@@ -824,7 +837,9 @@ try
         NSx.MetaTags.Timestamp = 0; % No timestamp otherwise
         NSx.MetaTags.DataPoints = double(f.EOF-f.EOexH)/(channelCount*2);
         NSx.MetaTags.DataDurationSec = NSx.MetaTags.DataPoints/NSx.MetaTags.SamplingFreq;
-    elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+    elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
         if flagOneSamplePerPacket
             if flagSegment
                 
@@ -939,7 +954,7 @@ try
                     % Fixing another bug in Central 6.01.00.00 TOC where DataPoints is
                     % not written back into the Data Header
                     %% BIG NEEDS TO BE FIXED
-                    NSx.MetaTags.DataPoints = floor(double(f.EOF - (f.EOexH+1+timestampSize+4))/(channelCount*2));
+                    NSx.MetaTags.DataPoints = floor(double(f.EOF - (f.EOexH+1+timestampSize+4))/(channelCount*sampleSize));
                     NSx.MetaTags.DataDurationSec = NSx.MetaTags.DataPoints/NSx.MetaTags.SamplingFreq;
                     break;
                 end
@@ -966,11 +981,11 @@ try
                 NSx.MetaTags.DataPoints(segmentCount) = fread(FID, 1, 'uint32=>double');
                 NSx.MetaTags.DataDurationSec(segmentCount) = NSx.MetaTags.DataPoints(segmentCount)/NSx.MetaTags.SamplingFreq;
                 file.MetaTags.DataDurationTimeRes(segmentCount) = NSx.MetaTags.DataPoints(segmentCount)*NSx.MetaTags.TimeRes/NSx.MetaTags.SamplingFreq;
-                fseek(FID, NSx.MetaTags.DataPoints(segmentCount) * channelCount * 2, 'cof');
+                fseek(FID, NSx.MetaTags.DataPoints(segmentCount) * channelCount * sampleSize, 'cof');
 
                 % Fixing the bug in 6.01.00.00 TOC where DataPoints is not
                 % updated and is left as 0
-                % NSx.MetaTags.DataPoints(segmentCount) = (f.EOData(segmentCount)-f.BOData(segmentCount))/(ChannelCount*2);
+                % NSx.MetaTags.DataPoints(segmentCount) = (f.EOData(segmentCount)-f.BOData(segmentCount))/(ChannelCount*bytesPerSample);
             end
         end
     end
@@ -980,7 +995,9 @@ try
         % Determining DataPoints
         f.BOData = f.EOexH;
         f.EOData = f.EOF;
-    elseif or(strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD'), strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP'))
+    elseif strcmpi(NSx.MetaTags.FileTypeID, 'NEURALCD') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'NEUCDFLT') || ...
+           strcmpi(NSx.MetaTags.FileTypeID, 'BRSMPGRP')
         byteOffset = 1 + timestampSize + 4;
         if flagOneSamplePerPacket
             segmentOffset = f.EOexH;
@@ -988,8 +1005,8 @@ try
             f.EOData = segmentOffset + packetSize*cumsum(NSx.MetaTags.DataPoints);
         else
             segmentOffset = f.EOexH + (1:length(NSx.MetaTags.DataPoints))*byteOffset;
-            f.BOData = segmentOffset + [0 cumsum(channelCount*NSx.MetaTags.DataPoints(1:end-1)*2)];
-            f.EOData = segmentOffset + 2*channelCount*cumsum(NSx.MetaTags.DataPoints) - 1;
+            f.BOData = segmentOffset + [0 cumsum(channelCount*NSx.MetaTags.DataPoints(1:end-1)*sampleSize)];
+            f.EOData = segmentOffset + sampleSize*channelCount*cumsum(NSx.MetaTags.DataPoints) - 1;
         end
     end
     
@@ -1175,21 +1192,21 @@ try
             if flagOneSamplePerPacket
                 fseek(FID, (segmentStartDataPoint(currSegment) - 1) * packetSize, 'cof');
             else
-                fseek(FID, (segmentStartDataPoint(currSegment) - 1) * 2 * channelCount, 'cof');
+                fseek(FID, (segmentStartDataPoint(currSegment) - 1) * sampleSize * channelCount, 'cof');
             end
             
             % seek to first requested channel in the current packet
-            fseek(FID, (requestedFirstChannel-1) * 2, 'cof');
+            fseek(FID, (requestedFirstChannel-1) * sampleSize, 'cof');
             
             % set up parameters for reading data
-            precisionString = sprintf('%d*int16=>%s',numChannelsToRead,requestedPrecisionType);
+            precisionString = sprintf('%d*%s=>%s',numChannelsToRead,sampleType,requestedPrecisionType);
             outputDimensions = [numChannelsToRead floor(segmentDataPoints(currSegment)/requestedSkipFactor)];
             if flagOneSamplePerPacket
-                bytesToSkipNormal = packetSize - 2*numChannelsToRead; % standard (i.e., skip factor==1)
+                bytesToSkipNormal = packetSize - sampleSize*numChannelsToRead; % standard (i.e., skip factor==1)
                 bytesSkipFactor = packetSize*(requestedSkipFactor - 1); % additional to skip (skip factor > 1)
             else
-                bytesToSkipNormal = 2*(channelCount - numChannelsToRead);
-                bytesSkipFactor = 2*channelCount*(requestedSkipFactor-1);
+                bytesToSkipNormal = sampleSize*(channelCount - numChannelsToRead);
+                bytesSkipFactor = sampleSize*channelCount*(requestedSkipFactor-1);
             end
             bytesToSkip = bytesToSkipNormal + bytesSkipFactor; % total
             
