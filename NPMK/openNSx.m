@@ -1261,7 +1261,9 @@ end
 if flagReadData
     channelsRead = min(requestedChannelIndex):max(requestedChannelIndex);
     idxToKeep = ismember(channelsRead,requestedChannelIndex);
-    NSx.Data = cellfun(@(x)x(idxToKeep,:),NSx.Data,'UniformOutput',false);
+    if length(nonzeros(idxToKeep)) ~= size(NSx.Data{1}, 1)
+      NSx.Data = cellfun(@(x)x(idxToKeep,:),NSx.Data,'UniformOutput',false);
+    end
 end
 if isfield(NSx,'ElectrodesInfo')
     idxToRemove = ~ismember(1:length(NSx.ElectrodesInfo),requestedChannelIndex);
